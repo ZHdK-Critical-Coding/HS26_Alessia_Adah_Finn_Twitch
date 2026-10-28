@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Null Zuschauer – Live</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="live.css" />
+  </head>
+  <body class="live">
+    <div id="stage" aria-label="Twitch-Player">
+      <div id="player-a" class="player-slot is-active"></div>
+      <div id="player-b" class="player-slot is-preload" aria-hidden="true"></div>
+    </div>
+    <div id="status" class="status" role="status" hidden>
+      <p id="status-text"></p>
+    </div>
+    <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+    <script src="live.js"></script>
+  </body>
+</html>

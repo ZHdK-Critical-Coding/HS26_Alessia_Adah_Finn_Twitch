@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Null Zuschauer – Bedienung</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="controls.css" />
+  </head>
+  <body class="controls-page">
+    <header class="top">
+      <div>
+        <h1>Bedienung</h1>
+        <p class="lede">
+          Einstellungen für Screenshots, Live-Druck und Streifen.
+          Live-Ansicht: <a href="/">/</a> oder <a href="/live">/live</a>
+          — dort <kbd>Enter</kbd> für den nächsten Stream.
+        </p>
+      </div>
+      <p id="toast" class="toast" hidden role="alert"></p>
+    </header>
+
+    <section class="panel" aria-labelledby="stream-heading">
+      <h2 id="stream-heading">Stream</h2>
+      <div class="row">
+        <button id="next" type="button">Nächster Stream</button>
+        <a class="btn secondary" href="/" target="_blank" rel="noopener">Live öffnen</a>
+      </div>
+      <div id="hud" class="hud" hidden>
+        <p id="channel-name" class="name"></p>
+        <p id="viewer-line" class="viewers">0 Zuschauer*innen</p>
+        <p id="channel-meta" class="meta"></p>
+      </div>
+      <p id="status-text" class="hint">Noch kein Stream geladen.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="cap-heading">
+      <h2 id="cap-heading">Aufnahme & Druck</h2>
+      <div class="row">
+        <button id="shots" type="button" aria-pressed="true">Screenshots an</button>
+        <button id="print-live" type="button" aria-pressed="true">Live-Druck an</button>
+        <a class="btn secondary" href="/print" target="_blank" rel="noopener">Streifen / Druck</a>
+      </div>
+      <p id="print-meta" class="hint"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="filter-heading">
+      <h2 id="filter-heading">Pool-Filter (Kategorien & Sprachen)</h2>
+      <p class="hint">
+        Steuert die Suche nach 0-Zuschauer-Streams. Standard: IRL/Preferred 7 : Gaming 3,
+        alle gelisteten Kategorien und Sprachen aktiv. Gespeichert in <code>pool_filters.json</code>.
+      </p>
+      <div class="row filter-actions">
+        <button id="filters-save" type="button">Filter speichern</button>
+        <button id="filters-reset" type="button" class="secondary">Auf Standard zurücksetzen</button>
+        <label class="check gaming-check">
+          <input id="gaming-enabled" type="checkbox" checked />
+          Gaming erlauben
+        </label>
+      </div>
+      <div class="filter-grid">
+        <div>
+          <h3>Kategorien (IRL / Preferred)</h3>
+          <div id="category-list" class="check-list"></div>
+        </div>
+        <div>
+          <h3>Sprachen</h3>
+          <div id="language-list" class="check-list"></div>
+        </div>
+      </div>
+      <p id="filter-status" class="hint"></p>
+    </section>
+
+    <section class="panel strip-panel" aria-labelledby="strip-heading">
+      <h2 id="strip-heading">Endlosstreifen</h2>
+      <iframe
+        id="print-embed"
+        class="print-embed"
+        title="Streifen-Druckansicht"
+        src="/print"
+      ></iframe>
+    </section>
+
+    <script src="controls.js"></script>
+  </body>
+</html>

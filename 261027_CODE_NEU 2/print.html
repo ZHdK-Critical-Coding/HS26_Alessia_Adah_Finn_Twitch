@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Endlosstreifen – Druck</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #111;
+        color: #eee;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      .bar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.92);
+        border-bottom: 1px solid #333;
+      }
+      .bar p {
+        margin: 0;
+        font-size: 14px;
+        color: #bbb;
+      }
+      .bar strong {
+        color: #fff;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      button,
+      a.btn {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: #fff;
+        color: #111;
+        font: 650 14px/1 "Segoe UI", system-ui, sans-serif;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+      }
+      button.secondary,
+      a.btn.secondary {
+        background: #333;
+        color: #fff;
+      }
+      .stage {
+        display: flex;
+        justify-content: center;
+        padding: 16px;
+      }
+      #strip {
+        display: block;
+        width: min(100%, 720px);
+        height: auto;
+        background: #000;
+        box-shadow: 0 0 0 1px #333;
+      }
+      .empty {
+        margin: 48px auto;
+        max-width: 28rem;
+        text-align: center;
+        color: #999;
+        line-height: 1.5;
+      }
+      @media print {
+        .bar {
+          display: none !important;
+        }
+        html,
+        body {
+          background: #fff;
+        }
+        .stage {
+          padding: 0;
+        }
+        #strip {
+          width: 100%;
+          max-width: none;
+          box-shadow: none;
+        }
+        .empty {
+          display: none;
+        }
+      }
+      @page {
+        margin: 0;
+        size: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <p id="meta">Endlosstreifen wird geladen …</p>
+      <div class="actions">
+        <a class="btn secondary" href="/">Player</a>
+        <button type="button" id="refresh">Aktualisieren</button>
+        <button type="button" id="print">Drucken</button>
+      </div>
+    </div>
+    <div class="stage">
+      <p id="empty" class="empty" hidden>
+        Noch kein Streifen. Starte den Player, lass Screenshots an und warte
+        auf die erste Aufnahme (jede Minute).
+      </p>
+      <img id="strip" alt="Endlosstreifen" hidden />
+    </div>
+    <script>
+      const strip = document.querySelector("#strip");
+      const empty = document.querySelector("#empty");
+      const meta = document.querySelector("#meta");
+      const POLL_MS = 5000;
+      let lastUpdated = null;
+
+      async function loadStrip() {
+        try {
+          const response = await fetch("/api/strip", { cache: "no-store" });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Streifen nicht verfügbar.");
+          }
+          if (!data.exists) {
+            strip.hidden = true;
+            empty.hidden = false;
+            meta.innerHTML = "Noch <strong>kein Streifen</strong>.";
+            return;
+          }
+          empty.hidden = true;
+          strip.hidden = false;
+          if (data.updatedAt !== lastUpdated) {
+            lastUpdated = data.updatedAt;
+            strip.src = data.url + "?t=" + encodeURIComponent(data.updatedAt);
+          }
+          const frames = data.frames != null ? data.frames + " Frames · " : "";
+          meta.innerHTML =
+            "<strong>Endlosstreifen</strong> · " +
+            frames +
+            (data.width || "?") +
+            "×" +
+            (data.height || "?") +
+            " · zuletzt " +
+            (data.updatedAt || "—");
+        } catch (error) {
+          meta.textContent = error.message || "Fehler beim Laden.";
+        }
+      }
+
+      document.querySelector("#refresh").addEventListener("click", loadStrip);
+      document.querySelector("#print").addEventListener("click", () => {
+        window.print();
+      });
+      loadStrip();
+      setInterval(loadStrip, POLL_MS);
+    </script>
+  </body>
+</html>

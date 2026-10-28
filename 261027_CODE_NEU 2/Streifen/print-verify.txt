@@ -1,0 +1,5 @@
+GET /print -> 200
+GET /api/strip:
+{"exists": true, "url": "/Screenshots/endless_strip.jpg", "streifenUrl": "/Streifen/endless_strip.jpg", "path": "/Users/macbookair/Desktop/twitch-null/Screenshots/endless_strip.jpg", "streifenPath": "/Users/macbookair/Desktop/twitch-null/Streifen/endless_strip.jpg", "frames": 4, "width": 960, "height": 2160, "updatedAt": "2026-10-26 14:01:57", "font": "/Users/macbookair/Desktop/twitch-null/assets/PRINT_FONT.ttf"}
+GET /Screenshots/endless_strip.jpg -> 200 203587b
+GET /Streifen/endless_strip.jpg -> 200 203587b

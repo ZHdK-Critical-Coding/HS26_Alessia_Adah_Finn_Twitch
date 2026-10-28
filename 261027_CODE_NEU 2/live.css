@@ -1,0 +1,110 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body.live {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  background: #000;
+  color: #fff;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  cursor: none;
+}
+
+/*
+  100% Viewport — kein Overscan/Zoom.
+  Zwei Slots: aktiv sichtbar, Preload unsichtbar aber mit voller Fläche
+  (Twitch puffert sonst nicht zuverlässig).
+*/
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.player-slot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  background: #000;
+  pointer-events: none !important;
+  overflow: hidden;
+  transform: none;
+}
+
+.player-slot.is-active {
+  z-index: 2;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Unsichtbar, aber nicht display:none — Embed muss weiter laden/puffern. */
+.player-slot.is-preload {
+  z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.player-slot iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  border: 0;
+  pointer-events: none !important;
+  transform: none !important;
+}
+
+/* Unsichtbarer Unlock — eine Geste, ohne UI. */
+#unlock-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#audio-debug {
+  display: none !important;
+}
+
+.status {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #000;
+  text-align: center;
+  cursor: default;
+  pointer-events: none;
+}
+
+.status p {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: #ccc;
+}

@@ -77,8 +77,9 @@ Nach jedem erfolgreichen Capture (und nach jedem Titelbalken beim Streamwechsel)
 
 Ohne `ESCPOS_DEVICE` sucht der Server beim Start nach direkt ansprechbaren Druckern (USB-Druckerklasse, `/dev/usb/lp*`). Epson-TM-Geräte (USB `04b8:0e..` oder „TM-“ im Namen) stehen oben.
 
-- **Im Terminal:** Menü mit den gefundenen Druckern sowie `s` Simulation, `r` neu suchen, `n` kein Live-Druck oder eine direkte Eingabe (`tcp://…`, Pfad, `usb:…`). Enter oder 20 s ohne Eingabe (`ESCPOS_SELECT_TIMEOUT`, 0 = warten) übernimmt den Vorschlag: erster Epson-TM, sonst `n`.
-- **Ohne Terminal** (z. B. `run-server.sh`, `screen -dm`): automatisch der erste Epson-TM, sonst Live-Druck aus.
+- **Epson-TM gefunden:** wird automatisch genommen, kein Menü.
+- **Kein Epson-TM, im Terminal** (auch über `run-server.sh` — das Menü erscheint im Terminal, nicht im Log): Menü mit den gefundenen Geräten sowie `s` Simulation, `r` neu suchen (Drucker einstecken, dann `r`), `n` kein Live-Druck oder eine direkte Eingabe (`tcp://…`, Pfad, `usb:…`). Enter oder 20 s ohne Eingabe (`ESCPOS_SELECT_TIMEOUT`, 0 = warten) = `n`.
+- **Kein Epson-TM, ohne Terminal** (z. B. `screen -dm`, launchd): Live-Druck aus.
 - **`ESCPOS_DEVICE` gesetzt:** keine Suche, kein Menü.
 
 | Variable | Standard | Bedeutung |

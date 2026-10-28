@@ -6,7 +6,7 @@ aber mit nativer Auflösung: GS v 0 Rasterbild, quadratische Punkte, volle Breit
 TM-T88V: 180 × 180 dpi, 80-mm-Papier → 512 Punkte Druckbreite (72 mm).
 (203 dpi / 576 Punkte wären TM-T20/T82 — dann ESCPOS_WIDTH=576 setzen.)
 
-ESCPOS_DEVICE (ohne Angabe: Auswahl beim Start, siehe choose_device):
+ESCPOS_DEVICE (ohne Angabe: Epson-TM automatisch, sonst Auswahl beim Start, siehe choose_device):
   usb                 erster USB-Drucker der Klasse 7 (Epson bevorzugt)
   usb:04b8:0202       bestimmter USB-Drucker (Vendor:Product, hex)
   usb:04b8:0202@1-2.3 dito an Bus 1, Port 2.3 (gleiche Drucker unterscheiden)
@@ -331,16 +331,29 @@ def discover():
     return found
 
 
-def _ask(prompt, timeout):
+def _terminal():
+    """Ausgabe fürs Menü: stdout, oder direkt das Terminal, wenn stdout ins Log geht
+    (run-server.sh leitet stdout/stderr nach /tmp/twitch-null-server.log um)."""
+    import sys
+
+    if sys.stdout.isatty():
+        return sys.stdout
+    try:
+        return open("/dev/tty", "w")
+    except OSError:
+        return sys.stdout
+
+
+def _ask(prompt, timeout, out):
     """input() mit Zeitlimit; None bei Zeitablauf oder EOF."""
     import select
     import sys
 
-    print(prompt, end="", flush=True)
+    print(prompt, end="", file=out, flush=True)
     if timeout:
         ready, _, _ = select.select([sys.stdin], [], [], timeout)
         if not ready:
-            print("", flush=True)
+            print("", file=out, flush=True)
             return None
     line = sys.stdin.readline()
     return line.strip() if line else None
@@ -349,8 +362,9 @@ def _ask(prompt, timeout):
 def choose_device(interactive=None):
     """Wählt beim Serverstart das ESC/POS-Gerät.
 
-    ESCPOS_DEVICE gesetzt → wird übernommen. Sonst wird gesucht: im Terminal per Menü
-    (Enter bzw. Zeitablauf = Vorschlag), ohne Terminal automatisch der erste Epson-TM.
+    ESCPOS_DEVICE gesetzt → wird übernommen. Sonst wird gesucht: ein Epson-TM wird
+    automatisch genommen; nur wenn keiner da ist, kommt im Terminal ein Auswahlmenü
+    (Enter bzw. Zeitablauf = kein Live-Druck), ohne Terminal ist Live-Druck dann aus.
     Rückgabe: Gerätespez. oder None (= Live-Druck aus).
     """
     import sys
@@ -361,28 +375,28 @@ def choose_device(interactive=None):
         interactive = sys.stdin.isatty()
     while True:
         found = discover()
-        suggestion = found[0]["spec"] if found and is_epson_tm(found[0]) else None
+        if found and is_epson_tm(found[0]):
+            spec = found[0]["spec"]
+            print(f"ESC/POS: automatisch {found[0]['name']} ({spec})", flush=True)
+            set_device(spec)
+            return spec
         if not interactive:
-            if suggestion:
-                print(f"ESC/POS: automatisch {found[0]['name']} ({suggestion})", flush=True)
-                set_device(suggestion)
-                return suggestion
             print("ESC/POS: kein Epson-TM gefunden — Live-Druck aus", flush=True)
             return None
 
-        print("\nESC/POS-Drucker wählen:", flush=True)
+        out = _terminal()
+        print("\nKein Epson-TM gefunden. ESC/POS-Drucker wählen:", file=out, flush=True)
         for i, entry in enumerate(found, 1):
-            mark = "  ← Epson TM" if is_epson_tm(entry) else ""
-            print(f"  {i}) {entry['name']}  [{entry['detail']}]{mark}", flush=True)
+            print(f"  {i}) {entry['name']}  [{entry['detail']}]", file=out, flush=True)
         if not found:
-            print("  (kein USB-Drucker / keine Gerätedatei gefunden)", flush=True)
-        print("  s) Simulation (escpos_sim/)", flush=True)
-        print("  r) neu suchen", flush=True)
-        print("  n) kein Live-Druck", flush=True)
-        print("  oder direkt eingeben: tcp://host:9100, /dev/usb/lp0, usb:04b8:0202", flush=True)
-        default = "1" if suggestion else "n"
+            print("  (kein USB-Drucker / keine Gerätedatei gefunden)", file=out, flush=True)
+        print("  s) Simulation (escpos_sim/)", file=out, flush=True)
+        print("  r) neu suchen (Drucker einstecken, dann r)", file=out, flush=True)
+        print("  n) kein Live-Druck", file=out, flush=True)
+        print("  oder direkt eingeben: tcp://host:9100, /dev/usb/lp0, usb:04b8:0202", file=out, flush=True)
+        default = "n"
         wait = f", {SELECT_TIMEOUT} s" if SELECT_TIMEOUT else ""
-        answer = _ask(f"Auswahl [{default}{wait}]: ", SELECT_TIMEOUT)
+        answer = _ask(f"Auswahl [{default}{wait}]: ", SELECT_TIMEOUT, out)
         answer = (answer or default).strip()
         key = answer.casefold()
         if key == "r":
@@ -397,7 +411,7 @@ def choose_device(interactive=None):
         elif answer.startswith(("usb", "tcp://", "sim", "/")):
             spec = answer
         else:
-            print(f"Unbekannte Auswahl: {answer}", flush=True)
+            print(f"Unbekannte Auswahl: {answer}", file=out, flush=True)
             continue
         set_device(spec)
         print(f"ESC/POS: {spec}", flush=True)

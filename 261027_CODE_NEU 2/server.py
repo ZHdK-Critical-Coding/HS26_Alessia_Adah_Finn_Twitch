@@ -49,7 +49,7 @@ else:
         if _p not in _sys.path:
             _sys.path.insert(0, _p)
 
-PORT = 8787
+PORT = int(os.environ.get("PORT") or 8787)
 CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 POOL_TTL_SECONDS = 60
 POOL_MIN = 12
@@ -569,16 +569,13 @@ def _env_bool(name, default=True):
     return raw.strip().casefold() in ("1", "true", "yes", "on", "an")
 
 
-# Live-Druck: nur das jeweils neue Frame-/Balken-JPEG an CUPS (nicht den ganzen Streifen).
-# PRINT_LIVE=0|1 (Standard: an), PRINTER=Campusprint, optional LP_OPTIONS (z. B. "media=A4 CNDuplex=None").
+# Live-Druck: nur das jeweils neue Frame-/Balken-JPEG direkt per ESC/POS (ohne CUPS)
+# an den Thermodrucker. PRINT_LIVE=0|1 (Standard: an); Gerät/Breite siehe escpos.py
+# (ESCPOS_DEVICE=usb | usb:04b8:0202 | tcp://host:9100 | /dev/usb/lp0 | sim:Ordner).
+import escpos
+
 PRINT_LOCK = threading.Lock()
 PRINT_LIVE_ENABLED = _env_bool("PRINT_LIVE", True)
-PRINTER_NAME = (os.environ.get("PRINTER") or "Campusprint").strip() or "Campusprint"
-LP_OPTIONS = [
-    part
-    for part in re.split(r"[\s,]+", (os.environ.get("LP_OPTIONS") or "media=A4,CNDuplex=None,fit-to-page").strip())
-    if part
-]
 LAST_PRINT = {"jobId": None, "path": None, "at": None, "ok": None, "error": None}
 
 
@@ -974,7 +971,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
         set_print_live_enabled(enabled)
         state = "an" if enabled else "aus"
-        print(f"Live-Druck {state} → {PRINTER_NAME}", flush=True)
+        print(f"Live-Druck {state} → {escpos.describe()}", flush=True)
         self.send_json(200, print_live_status())
 
     def handle_random(self):
@@ -1128,14 +1125,14 @@ def print_live_status():
         last = dict(LAST_PRINT)
     return {
         "enabled": print_live_enabled(),
-        "printer": PRINTER_NAME,
-        "options": list(LP_OPTIONS),
+        "printer": escpos.describe(),
+        "options": escpos.options(),
         "last": last,
     }
 
 
 def print_frame(image_path, job_title=None):
-    """Sendet nur dieses JPEG an CUPS (Campusprint o. Ä.) — nicht den Endlosstreifen."""
+    """Rastert nur dieses JPEG auf Druckbreite und schickt es per ESC/POS — nicht den Endlosstreifen."""
     global LAST_PRINT
     if not print_live_enabled():
         return None
@@ -1144,42 +1141,8 @@ def print_frame(image_path, job_title=None):
         print(f"Live-Druck übersprungen (Datei fehlt): {image_path}", flush=True)
         return None
     title = job_title or image_path.stem
-    cmd = ["lp", "-d", PRINTER_NAME, "-t", title]
-    for opt in LP_OPTIONS:
-        cmd.extend(["-o", opt])
-    cmd.append(str(image_path))
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except FileNotFoundError:
-        msg = "lp/CUPS nicht gefunden"
-        print(f"Live-Druck fehlgeschlagen: {msg}", flush=True)
-        with PRINT_LOCK:
-            LAST_PRINT = {
-                "jobId": None,
-                "path": str(image_path),
-                "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "ok": False,
-                "error": msg,
-            }
-        return None
-    except subprocess.CalledProcessError as exc:
-        err = (exc.stderr or exc.stdout or str(exc)).strip()
-        print(f"Live-Druck fehlgeschlagen: {err}", flush=True)
-        with PRINT_LOCK:
-            LAST_PRINT = {
-                "jobId": None,
-                "path": str(image_path),
-                "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "ok": False,
-                "error": err,
-            }
-        return None
+        job_id = escpos.print_image(image_path, title=title)
     except Exception as exc:
         print(f"Live-Druck fehlgeschlagen: {exc}", flush=True)
         with PRINT_LOCK:
@@ -1192,15 +1155,6 @@ def print_frame(image_path, job_title=None):
             }
         return None
 
-    out = (result.stdout or "").strip()
-    # EN: "request id is Campusprint-42 (1 file(s))"
-    # DE: "Anfrage-ID ist Campusprint–42 (1 Datei(en))"
-    match = re.search(
-        r"(?:request id is|Anfrage-ID ist)\s+(\S+)",
-        out,
-        re.IGNORECASE,
-    )
-    job_id = match.group(1) if match else (out or None)
     with PRINT_LOCK:
         LAST_PRINT = {
             "jobId": job_id,
@@ -1209,7 +1163,7 @@ def print_frame(image_path, job_title=None):
             "ok": True,
             "error": None,
         }
-    print(f"Live-Druck → {PRINTER_NAME}: {job_id} ({image_path.name})", flush=True)
+    print(f"Live-Druck → {escpos.describe()}: {job_id} ({image_path.name})", flush=True)
     return job_id
 
 
@@ -1807,6 +1761,9 @@ def main():
         print(f"Schrift: {font}", flush=True)
     except FileNotFoundError as exc:
         print(f"Warnung: {exc}", flush=True)
+    # ESC/POS-Gerät wählen, bevor der erste Capture gedruckt wird.
+    if print_live_enabled() and escpos.choose_device() is None:
+        set_print_live_enabled(False)
     threading.Thread(target=lambda: CATALOG.refresh(force=True), daemon=True).start()
     threading.Thread(target=screenshot_loop, daemon=True).start()
     threading.Thread(target=prefetch_loop, daemon=True).start()
@@ -1825,8 +1782,8 @@ def main():
     print(f"Streifen-Ordner: {STREIFEN_DIR}", flush=True)
     live = "an" if print_live_enabled() else "aus"
     print(
-        f"Live-Druck {live} → Drucker «{PRINTER_NAME}» "
-        f"(PRINT_LIVE / PRINTER / /api/print-live)",
+        f"Live-Druck {live} → Drucker «{escpos.describe()}» "
+        f"(PRINT_LIVE / ESCPOS_DEVICE / /api/print-live)",
         flush=True,
     )
     try:

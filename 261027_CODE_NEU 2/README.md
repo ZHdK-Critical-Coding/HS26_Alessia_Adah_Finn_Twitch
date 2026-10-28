@@ -65,9 +65,36 @@ Solange ein Stream läuft und Screenshots an sind, speichert der Server **jede M
 | `Streifen/endless_strip.jpg` | Kopie im Ordner **Streifen** |
 | `Screenshots/*.jpg` | Einzel-Captures / Titelbalken pro Minute bzw. Wechsel |
 
-## Live-Druck (Stück für Stück)
+## Live-Druck (Stück für Stück, ESC/POS)
 
-Nach jedem erfolgreichen Capture (und nach jedem Titelbalken beim Streamwechsel) schickt der Server **nur dieses neue JPEG** per CUPS (`lp`) an den konfigurierten Drucker — **nicht** den ganzen `endless_strip.jpg`.
+Nach jedem erfolgreichen Capture (und nach jedem Titelbalken beim Streamwechsel) rastert der Server **nur dieses neue JPEG** auf die native Druckbreite und schickt es **direkt per ESC/POS** (ohne CUPS) an den Thermodrucker — **nicht** den ganzen `endless_strip.jpg`. Code: `escpos.py` (Python-Port von [Servers_Printer](https://github.com/ZHdK-Critical-Coding/Servers_Printer)).
+
+- **Epson TM-T88V:** 180 × 180 dpi, 80-mm-Papier → **512 Punkte** Breite, quadratische Punkte. Ein Frame (1304×675) wird 512×265 Punkte ≈ 37 mm hoch.
+- Rasterbild per `GS v 0` in Bändern à 256 Zeilen, Floyd-Steinberg-Dithering. Frames laufen nahtlos aneinander (kein Schnitt, kein Vorschub).
+- USB über `pyusb` + libusb (`brew install libusb`). Läuft gerade ein CUPS-Job auf demselben Drucker, ist das USB-Interface belegt.
+
+### Druckerwahl beim Start
+
+Ohne `ESCPOS_DEVICE` sucht der Server beim Start nach direkt ansprechbaren Druckern (USB-Druckerklasse, `/dev/usb/lp*`). Epson-TM-Geräte (USB `04b8:0e..` oder „TM-“ im Namen) stehen oben.
+
+- **Im Terminal:** Menü mit den gefundenen Druckern sowie `s` Simulation, `r` neu suchen, `n` kein Live-Druck oder eine direkte Eingabe (`tcp://…`, Pfad, `usb:…`). Enter oder 20 s ohne Eingabe (`ESCPOS_SELECT_TIMEOUT`, 0 = warten) übernimmt den Vorschlag: erster Epson-TM, sonst `n`.
+- **Ohne Terminal** (z. B. `run-server.sh`, `screen -dm`): automatisch der erste Epson-TM, sonst Live-Druck aus.
+- **`ESCPOS_DEVICE` gesetzt:** keine Suche, kein Menü.
+
+| Variable | Standard | Bedeutung |
+|----------|----------|-----------|
+| `ESCPOS_DEVICE` | *(Auswahl)* | `usb` (erster USB-Drucker, Epson bevorzugt), `usb:04b8:0202`, `usb:04b8:0202@1-2.3` (Bus-Port), `tcp://host:9100`, `/dev/usb/lp0`, `sim:Ordner` (Trockenlauf: `.bin` + `.png`) |
+| `ESCPOS_WIDTH` | `512` | Druckbreite in Punkten (576 für 203-dpi-Modelle wie TM-T20) |
+| `ESCPOS_DITHER` | `fs` | `fs` oder `threshold` |
+| `ESCPOS_THRESHOLD` | `128` | Schwelle für `threshold` |
+| `ESCPOS_GAMMA` | `1.0` | > 1 hellt Mitteltöne auf |
+| `ESCPOS_CUT` / `ESCPOS_FEED` | `0` / `0` | Schnitt bzw. Zeilenvorschub nach jedem Bild |
+| `PORT` | `8787` | HTTP-Port (z. B. `8788`, um neben dem CUPS-Original zu laufen) |
+
+```bash
+ESCPOS_DEVICE=sim:escpos_sim .venv/bin/python escpos.py Screenshots/irgendein_frame.jpg   # Test ohne Drucker
+ESCPOS_DEVICE=usb .venv/bin/python escpos.py Screenshots/irgendein_frame.jpg              # echter Testdruck
+```
 
 ### Ein/Aus
 
@@ -78,8 +105,8 @@ Nach jedem erfolgreichen Capture (und nach jedem Titelbalken beim Streamwechsel)
 | Env | `PRINT_LIVE=1` (an, Standard) bzw. `PRINT_LIVE=0` (aus) |
 
 ```bash
-PRINTER=Campusprint PRINT_LIVE=1 .venv/bin/python server.py
-LP_OPTIONS="media=A4 CNDuplex=None fit-to-page" .venv/bin/python server.py
+ESCPOS_DEVICE=usb PRINT_LIVE=1 .venv/bin/python server.py
+ESCPOS_DEVICE=tcp://192.168.1.50:9100 PORT=8788 .venv/bin/python server.py
 ```
 
 API-Status: `GET /api/print-live`. Aktueller Stream: `GET /api/current`. Streifen: `GET /api/strip`.

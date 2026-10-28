@@ -1,1 +1,2 @@
 pillow>=10
+pyusb>=1.2
